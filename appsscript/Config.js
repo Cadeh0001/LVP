@@ -1,0 +1,30 @@
+/**
+ * LVP Deck Sync — configuration.
+ *
+ * Source of truth: the "Consolidated Sheet" inside the tracked Drive folder.
+ * Target: the "LVP Current Portfolio Offerings" Google Slides deck.
+ */
+var CONFIG = {
+  // "LVP Current Portfolio Offerings" presentation.
+  DECK_ID: '1TbFxByXmSZzZPj-98m8zUXpGnMqCMaRoTAS2_eUVCv0',
+
+  // "Current Deals" folder (LV Petroleum > Funding Program > Current Deals).
+  // The Consolidated Sheet is located by name anywhere inside this tree, so the
+  // monthly subfolder ("July 2026", "August 2026", ...) can rotate freely.
+  TRACKED_FOLDER_ID: '17Zd7xnkRFFtGeGM2YpSZmhBUvkI813_i',
+  CONSOLIDATED_SHEET_NAME: 'Consolidated Sheet',
+
+  // Fallback if the name search finds nothing (current July 2026 sheet).
+  CONSOLIDATED_SHEET_FALLBACK_ID: '1XxGRiROgHwhlQFGkfhjqeF9znYIG5_90mh8vThf75fY',
+
+  // When true, syncDeck() only logs what it would do and makes no edits.
+  DRY_RUN: true,
+
+  // When a deal's sheet data changes, delete its slide pair and regenerate it
+  // from the template. (Manual one-off edits to that pair are lost on rebuild.)
+  REBUILD_ON_CHANGE: true,
+
+  // Treatment for deals that leave the sheet or flip to Available? = No:
+  // slides are hidden (skipped) and marked with this prefix.
+  REMOVED_PREFIX: 'REMOVED — ',
+};

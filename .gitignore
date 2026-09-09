@@ -1,0 +1,6 @@
+# clasp credentials / project binding (account-specific)
+.clasp.json
+.clasprc.json
+
+node_modules/
+.DS_Store
