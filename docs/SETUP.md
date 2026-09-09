@@ -4,7 +4,22 @@ The script must run as a Google account with **edit access to the deck** and
 **read access to the Current Deals folder and Consolidated Sheet** (the deck is
 owned by `storage2@sandsig.com`; any editor account works).
 
-## 1. Create the Apps Script project and push the code
+## 1. Create the Apps Script project and add the code
+
+### Option A — one-paste bundle (no tools needed)
+
+1. Go to <https://script.google.com> → **New project** → name it "LVP Deck Sync".
+2. Open the default `Code.gs`, delete its contents, and paste in the whole of
+   **`dist/Code.gs`** from this repo (all source files concatenated).
+3. **Project Settings** (gear) → check **Show "appsscript.json" manifest
+   file** → open `appsscript.json` in the editor and paste the repo's
+   `appsscript/appsscript.json` over it (sets timezone + permissions).
+4. Save, then continue to step 2 below.
+
+To update later: regenerate the bundle (`scripts/build-bundle.sh`) after any
+source change and repeat the paste.
+
+### Option B — clasp (better for ongoing development)
 
 Requires Node.js. [`clasp`](https://github.com/google/clasp) is Google's CLI
 for Apps Script.
@@ -26,10 +41,6 @@ clasp push
 
 `clasp create` writes a `.clasp.json` (gitignored — it's account-specific).
 On any future code change: `clasp push` again.
-
-> No Node? Alternative: create a project manually at
-> <https://script.google.com>, then copy each `appsscript/*.js` file into it
-> (and paste `appsscript.json` under Project Settings → Show manifest).
 
 ## 2. One-time bootstrap (run from the Apps Script editor)
 
