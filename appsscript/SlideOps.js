@@ -50,6 +50,49 @@ function deletePair(pair) {
   pair.summary.remove();
 }
 
+/**
+ * Distinctive values that are safe to find-and-replace anywhere on the pair
+ * ("$16,000,000", "8.00%", "PTL Carlsbad", ...). Short stat-chip values like
+ * "6" or "0" are NOT here — those only ever get whole-line, unambiguous
+ * replacement via replaceUniqueLine.
+ */
+var GLOBAL_UPDATE_FIELDS = {
+  name: 1, location: 1, address: 1, price: 1, cap: 1, rent: 1,
+  ebitdar: 1, ebitda: 1, coverage: 1, asof: 1
+};
+
+/**
+ * Patch changed sheet values in place on a deal's existing slides, leaving
+ * everything else (including manual customizations) untouched.
+ * @param {Array<{field: string, from: string, to: string}>} changes
+ */
+function applyFieldUpdates(pair, changes, dealName) {
+  changes.forEach(function (ch) {
+    var count = 0;
+    if (GLOBAL_UPDATE_FIELDS[ch.field]) {
+      if (ch.from) {
+        count += pair.overview.replaceAllText(ch.from, ch.to);
+        count += pair.summary.replaceAllText(ch.from, ch.to);
+      }
+    } else if (ch.field === 'overview') {
+      if (ch.from) count = replaceUniqueLine(pair.overview, ch.from, ch.to);
+    } else {
+      // Stat chip: whole-line only, and only when unambiguous.
+      if (ch.from && ch.from !== '—') count = replaceUniqueLine(pair.overview, ch.from, ch.to);
+    }
+    if (count > 0) {
+      Logger.log('"%s": %s updated "%s" -> "%s".', dealName, ch.field, ch.from, ch.to);
+    } else if (count < 0) {
+      Logger.log('"%s": %s NOT updated — "%s" appears %s times on the slide, ambiguous. Edit by hand.',
+        dealName, ch.field, ch.from, -count);
+    } else {
+      Logger.log('"%s": %s NOT updated — old value "%s" not found on the slides ' +
+        '(manually overridden?). Left as-is; new sheet value is "%s".',
+        dealName, ch.field, ch.from, ch.to);
+    }
+  });
+}
+
 /** Point the "Open in Google Maps" / "Satellite" shapes at the deal's address. */
 function setDealLinks(slide, deal) {
   var q = encodeURIComponent(deal.address);

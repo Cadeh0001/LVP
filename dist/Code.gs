@@ -25,9 +25,11 @@ var CONFIG = {
   // When true, syncDeck() only logs what it would do and makes no edits.
   DRY_RUN: true,
 
-  // When a deal's sheet data changes, delete its slide pair and regenerate it
-  // from the template. (Manual one-off edits to that pair are lost on rebuild.)
-  REBUILD_ON_CHANGE: true,
+  // When a deal's sheet data changes, patch only the changed values in place
+  // on its existing slides (old value -> new value). Manual edits to anything
+  // else — including custom stat chips — are preserved; if an old value can't
+  // be found (because it was manually overridden), it's left alone and logged.
+  UPDATE_ON_CHANGE: true,
 
   // Treatment for deals that leave the sheet or flip to Available? = No:
   // slides are hidden (skipped) and marked with this prefix.
@@ -235,6 +237,32 @@ function replaceLineExact(slide, exact, replacement) {
     }
   });
   return count;
+}
+
+/**
+ * Replace a whole line equal to `exact`, but only if exactly ONE such line
+ * exists on the slide — used for short values (stat chips) where the same
+ * text could legitimately appear twice and guessing would corrupt the slide.
+ * @return {number} 1 if replaced; 0 if not found; -n if n ambiguous matches.
+ */
+function replaceUniqueLine(slide, exact, replacement) {
+  var hits = [];
+  getAllShapes(slide).forEach(function (sh) {
+    var s;
+    try { s = sh.getText().asString(); } catch (e) { return; }
+    var lines = s.split('\n');
+    var offset = 0;
+    for (var i = 0; i < lines.length; i++) {
+      if (lines[i].trim() === exact) {
+        hits.push({ shape: sh, start: offset + lines[i].indexOf(lines[i].trim()) });
+      }
+      offset += lines[i].length + 1;
+    }
+  });
+  if (hits.length !== 1) return hits.length === 0 ? 0 : -hits.length;
+  var h = hits[0];
+  h.shape.getText().getRange(h.start, h.start + exact.length).setText(replacement);
+  return 1;
 }
 
 // ---------------------------------------------------------------------------
@@ -574,6 +602,49 @@ function createPairFromTemplate(pres, template, deal, monthLabel) {
 function deletePair(pair) {
   pair.overview.remove();
   pair.summary.remove();
+}
+
+/**
+ * Distinctive values that are safe to find-and-replace anywhere on the pair
+ * ("$16,000,000", "8.00%", "PTL Carlsbad", ...). Short stat-chip values like
+ * "6" or "0" are NOT here — those only ever get whole-line, unambiguous
+ * replacement via replaceUniqueLine.
+ */
+var GLOBAL_UPDATE_FIELDS = {
+  name: 1, location: 1, address: 1, price: 1, cap: 1, rent: 1,
+  ebitdar: 1, ebitda: 1, coverage: 1, asof: 1
+};
+
+/**
+ * Patch changed sheet values in place on a deal's existing slides, leaving
+ * everything else (including manual customizations) untouched.
+ * @param {Array<{field: string, from: string, to: string}>} changes
+ */
+function applyFieldUpdates(pair, changes, dealName) {
+  changes.forEach(function (ch) {
+    var count = 0;
+    if (GLOBAL_UPDATE_FIELDS[ch.field]) {
+      if (ch.from) {
+        count += pair.overview.replaceAllText(ch.from, ch.to);
+        count += pair.summary.replaceAllText(ch.from, ch.to);
+      }
+    } else if (ch.field === 'overview') {
+      if (ch.from) count = replaceUniqueLine(pair.overview, ch.from, ch.to);
+    } else {
+      // Stat chip: whole-line only, and only when unambiguous.
+      if (ch.from && ch.from !== '—') count = replaceUniqueLine(pair.overview, ch.from, ch.to);
+    }
+    if (count > 0) {
+      Logger.log('"%s": %s updated "%s" -> "%s".', dealName, ch.field, ch.from, ch.to);
+    } else if (count < 0) {
+      Logger.log('"%s": %s NOT updated — "%s" appears %s times on the slide, ambiguous. Edit by hand.',
+        dealName, ch.field, ch.from, -count);
+    } else {
+      Logger.log('"%s": %s NOT updated — old value "%s" not found on the slides ' +
+        '(manually overridden?). Left as-is; new sheet value is "%s".',
+        dealName, ch.field, ch.from, ch.to);
+    }
+  });
 }
 
 /** Point the "Open in Google Maps" / "Satellite" shapes at the deal's address. */
@@ -1068,18 +1139,18 @@ function syncDeck() {
   deals.forEach(function (deal) {
     var pair = idx.pairs[deal.key];
     if (deal.available) {
-      var hash = dealHash(deal, source.monthLabel);
       if (!pair) {
         plan.push({ type: 'create', deal: deal });
         return;
       }
-      var stored = props.getProperty('deal:' + deal.key);
-      if (stored === null) {
+      var snap = dealSnapshot(deal, source.monthLabel);
+      var stored = readStoredSnapshot(props, deal.key);
+      if (!stored) {
         // First time we see this pair (e.g. just bootstrapped): adopt as-is.
         adoptions.push(deal);
-      } else if (stored !== hash && CONFIG.REBUILD_ON_CHANGE) {
-        plan.push({ type: 'rebuild', deal: deal, pair: pair });
-        return;
+      } else if (CONFIG.UPDATE_ON_CHANGE) {
+        var changes = diffSnapshots(stored, snap);
+        if (changes.length) plan.push({ type: 'update', deal: deal, pair: pair, changes: changes });
       }
       if (pair.overview.isSkipped()) plan.push({ type: 'reinstate', deal: deal, pair: pair });
     } else if (pair && !pair.overview.isSkipped()) {
@@ -1105,15 +1176,17 @@ function syncDeck() {
   // ---- Execute ------------------------------------------------------------
   plan.forEach(function (a) {
     switch (a.type) {
-      case 'rebuild':
       case 'create':
         if (!idx.template) {
-          Logger.log('Cannot %s "%s": no template pair exists. Run setupTemplate().', a.type, a.deal.name);
+          Logger.log('Cannot create "%s": no template pair exists. Run setupTemplate().', a.deal.name);
           return;
         }
-        if (a.type === 'rebuild') deletePair(a.pair);
         idx.pairs[a.deal.key] = createPairFromTemplate(pres, idx.template, a.deal, source.monthLabel);
-        props.setProperty('deal:' + a.deal.key, dealHash(a.deal, source.monthLabel));
+        storeSnapshot(props, a.deal, source.monthLabel);
+        break;
+      case 'update':
+        applyFieldUpdates(a.pair, a.changes, a.deal.name);
+        storeSnapshot(props, a.deal, source.monthLabel);
         break;
       case 'reinstate':
         reinstatePair(a.pair);
@@ -1123,9 +1196,7 @@ function syncDeck() {
         break;
     }
   });
-  adoptions.forEach(function (deal) {
-    props.setProperty('deal:' + deal.key, dealHash(deal, source.monthLabel));
-  });
+  adoptions.forEach(function (deal) { storeSnapshot(props, deal, source.monthLabel); });
 
   // ---- Ordering, numbering, rollups --------------------------------------
   var activePairs = active
@@ -1140,16 +1211,67 @@ function syncDeck() {
     fmtPct(totals.cap), fmtCov(totals.coverage));
 }
 
-/** Stable fingerprint of everything that lands on a deal's slides. */
-function dealHash(deal, monthLabel) {
-  return JSON.stringify([
-    deal.name, deal.location, deal.address, deal.price, deal.cap, deal.rent,
-    deal.ebitdar, deal.coverage, deal.overviewText, deal.stats, monthLabel
-  ]);
+/**
+ * Everything that lands on a deal's slides, in the exact formatted strings the
+ * slides carry — stored after each sync so the next run can diff field-by-field
+ * and patch only what changed.
+ */
+function dealSnapshot(deal, monthLabel) {
+  return {
+    name: deal.name,
+    location: deal.location,
+    address: deal.address,
+    overview: deal.overviewText || '',
+    price: fmtMoney(deal.price),
+    cap: fmtPct(deal.cap),
+    rent: fmtMoney(deal.rent),
+    ebitdar: fmtMoney(deal.ebitdar),
+    ebitda: fmtMoney(deal.ebitda),
+    coverage: fmtCov(deal.coverage),
+    acres: deal.stats.acres,
+    trucks: deal.stats.trucks,
+    pumps: deal.stats.pumps,
+    showers: deal.stats.showers,
+    bays: deal.stats.bays,
+    aadt: deal.stats.aadt,
+    asof: monthLabel || ''
+  };
+}
+
+function storeSnapshot(props, deal, monthLabel) {
+  props.setProperty('deal:' + deal.key, JSON.stringify(dealSnapshot(deal, monthLabel)));
+}
+
+function readStoredSnapshot(props, key) {
+  var raw = props.getProperty('deal:' + key);
+  if (!raw) return null;
+  try {
+    var parsed = JSON.parse(raw);
+    // Older versions stored an array hash — treat as "no snapshot" (re-adopt).
+    return (parsed && !Array.isArray(parsed) && typeof parsed === 'object') ? parsed : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function diffSnapshots(stored, current) {
+  var changes = [];
+  Object.keys(current).forEach(function (field) {
+    var from = stored[field];
+    var to = current[field];
+    if (from !== undefined && from !== to) {
+      changes.push({ field: field, from: from, to: to });
+    }
+  });
+  return changes;
 }
 
 function describeAction(a) {
-  return a.type + ':' + (a.deal ? a.deal.name : a.label);
+  var label = a.type + ':' + (a.deal ? a.deal.name : a.label);
+  if (a.type === 'update') {
+    label += '(' + a.changes.map(function (c) { return c.field; }).join(',') + ')';
+  }
+  return label;
 }
 
 // ---------------------------------------------------------------------------

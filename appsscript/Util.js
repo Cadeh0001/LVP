@@ -193,6 +193,32 @@ function replaceLineExact(slide, exact, replacement) {
   return count;
 }
 
+/**
+ * Replace a whole line equal to `exact`, but only if exactly ONE such line
+ * exists on the slide — used for short values (stat chips) where the same
+ * text could legitimately appear twice and guessing would corrupt the slide.
+ * @return {number} 1 if replaced; 0 if not found; -n if n ambiguous matches.
+ */
+function replaceUniqueLine(slide, exact, replacement) {
+  var hits = [];
+  getAllShapes(slide).forEach(function (sh) {
+    var s;
+    try { s = sh.getText().asString(); } catch (e) { return; }
+    var lines = s.split('\n');
+    var offset = 0;
+    for (var i = 0; i < lines.length; i++) {
+      if (lines[i].trim() === exact) {
+        hits.push({ shape: sh, start: offset + lines[i].indexOf(lines[i].trim()) });
+      }
+      offset += lines[i].length + 1;
+    }
+  });
+  if (hits.length !== 1) return hits.length === 0 ? 0 : -hits.length;
+  var h = hits[0];
+  h.shape.getText().getRange(h.start, h.start + exact.length).setText(replacement);
+  return 1;
+}
+
 // ---------------------------------------------------------------------------
 // Speaker-notes tags: how the sync recognizes which slide belongs to which deal
 // ---------------------------------------------------------------------------

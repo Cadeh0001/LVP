@@ -27,8 +27,11 @@ Available? = Yes/No                                           · 2 slides per de
   **hidden** (skipped when presenting/printing) and stamped with a
   `REMOVED — ` marker. Nothing is destroyed; flipping back to `Yes`
   reinstates it.
-- **Changed deal (any field edited):** the pair is rebuilt from the template so
-  the slides always match the sheet (`REBUILD_ON_CHANGE` in `Config.js`).
+- **Changed deal (any field edited):** only the changed values are patched in
+  place on that deal's existing slides (old value → new value). Manual
+  customizations — including hand-edited or nonstandard stat chips — are left
+  untouched; if an old value can't be found because it was manually
+  overridden, it's skipped and logged (`UPDATE_ON_CHANGE` in `Config.js`).
 - **Every run** also recomputes the cover stats (property count, portfolio
   price, blended CAP, blended coverage, subtitle sentence), rebuilds the
   "Portfolio at a Glance" table, reorders the deal slides to sheet order, and
@@ -75,10 +78,14 @@ during business hours — 9 AM and 3 PM Eastern by default, see
 
 ## Known limits
 
-- Rebuild-on-change regenerates a deal's pair from the template, so one-off
-  manual edits to that specific pair are overwritten when its sheet row
-  changes. Style changes belong on the hidden template slides (they apply to
-  all future deals).
+- In-place updates find the *old* sheet value on the slide and swap it for the
+  new one. If you manually overrode that same value on the slide, the sync
+  can't find it — it leaves your edit alone and logs the mismatch. To bring a
+  field back under sync control, paste the sheet's current value onto the
+  slide.
+- Editing a deal's **address** changes its identity: the old pair goes to
+  REMOVED and a fresh pair is created from the template.
+- Style changes for future deals belong on the hidden template slides.
 - Deals whose row is deleted outright stay in the deck hidden + `REMOVED — `
   forever (their data is gone, so they can never be auto-reinstated). Delete
   those slides by hand when you're sure.

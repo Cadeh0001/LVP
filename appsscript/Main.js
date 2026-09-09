@@ -29,18 +29,18 @@ function syncDeck() {
   deals.forEach(function (deal) {
     var pair = idx.pairs[deal.key];
     if (deal.available) {
-      var hash = dealHash(deal, source.monthLabel);
       if (!pair) {
         plan.push({ type: 'create', deal: deal });
         return;
       }
-      var stored = props.getProperty('deal:' + deal.key);
-      if (stored === null) {
+      var snap = dealSnapshot(deal, source.monthLabel);
+      var stored = readStoredSnapshot(props, deal.key);
+      if (!stored) {
         // First time we see this pair (e.g. just bootstrapped): adopt as-is.
         adoptions.push(deal);
-      } else if (stored !== hash && CONFIG.REBUILD_ON_CHANGE) {
-        plan.push({ type: 'rebuild', deal: deal, pair: pair });
-        return;
+      } else if (CONFIG.UPDATE_ON_CHANGE) {
+        var changes = diffSnapshots(stored, snap);
+        if (changes.length) plan.push({ type: 'update', deal: deal, pair: pair, changes: changes });
       }
       if (pair.overview.isSkipped()) plan.push({ type: 'reinstate', deal: deal, pair: pair });
     } else if (pair && !pair.overview.isSkipped()) {
@@ -66,15 +66,17 @@ function syncDeck() {
   // ---- Execute ------------------------------------------------------------
   plan.forEach(function (a) {
     switch (a.type) {
-      case 'rebuild':
       case 'create':
         if (!idx.template) {
-          Logger.log('Cannot %s "%s": no template pair exists. Run setupTemplate().', a.type, a.deal.name);
+          Logger.log('Cannot create "%s": no template pair exists. Run setupTemplate().', a.deal.name);
           return;
         }
-        if (a.type === 'rebuild') deletePair(a.pair);
         idx.pairs[a.deal.key] = createPairFromTemplate(pres, idx.template, a.deal, source.monthLabel);
-        props.setProperty('deal:' + a.deal.key, dealHash(a.deal, source.monthLabel));
+        storeSnapshot(props, a.deal, source.monthLabel);
+        break;
+      case 'update':
+        applyFieldUpdates(a.pair, a.changes, a.deal.name);
+        storeSnapshot(props, a.deal, source.monthLabel);
         break;
       case 'reinstate':
         reinstatePair(a.pair);
@@ -84,9 +86,7 @@ function syncDeck() {
         break;
     }
   });
-  adoptions.forEach(function (deal) {
-    props.setProperty('deal:' + deal.key, dealHash(deal, source.monthLabel));
-  });
+  adoptions.forEach(function (deal) { storeSnapshot(props, deal, source.monthLabel); });
 
   // ---- Ordering, numbering, rollups --------------------------------------
   var activePairs = active
@@ -101,16 +101,67 @@ function syncDeck() {
     fmtPct(totals.cap), fmtCov(totals.coverage));
 }
 
-/** Stable fingerprint of everything that lands on a deal's slides. */
-function dealHash(deal, monthLabel) {
-  return JSON.stringify([
-    deal.name, deal.location, deal.address, deal.price, deal.cap, deal.rent,
-    deal.ebitdar, deal.coverage, deal.overviewText, deal.stats, monthLabel
-  ]);
+/**
+ * Everything that lands on a deal's slides, in the exact formatted strings the
+ * slides carry — stored after each sync so the next run can diff field-by-field
+ * and patch only what changed.
+ */
+function dealSnapshot(deal, monthLabel) {
+  return {
+    name: deal.name,
+    location: deal.location,
+    address: deal.address,
+    overview: deal.overviewText || '',
+    price: fmtMoney(deal.price),
+    cap: fmtPct(deal.cap),
+    rent: fmtMoney(deal.rent),
+    ebitdar: fmtMoney(deal.ebitdar),
+    ebitda: fmtMoney(deal.ebitda),
+    coverage: fmtCov(deal.coverage),
+    acres: deal.stats.acres,
+    trucks: deal.stats.trucks,
+    pumps: deal.stats.pumps,
+    showers: deal.stats.showers,
+    bays: deal.stats.bays,
+    aadt: deal.stats.aadt,
+    asof: monthLabel || ''
+  };
+}
+
+function storeSnapshot(props, deal, monthLabel) {
+  props.setProperty('deal:' + deal.key, JSON.stringify(dealSnapshot(deal, monthLabel)));
+}
+
+function readStoredSnapshot(props, key) {
+  var raw = props.getProperty('deal:' + key);
+  if (!raw) return null;
+  try {
+    var parsed = JSON.parse(raw);
+    // Older versions stored an array hash — treat as "no snapshot" (re-adopt).
+    return (parsed && !Array.isArray(parsed) && typeof parsed === 'object') ? parsed : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function diffSnapshots(stored, current) {
+  var changes = [];
+  Object.keys(current).forEach(function (field) {
+    var from = stored[field];
+    var to = current[field];
+    if (from !== undefined && from !== to) {
+      changes.push({ field: field, from: from, to: to });
+    }
+  });
+  return changes;
 }
 
 function describeAction(a) {
-  return a.type + ':' + (a.deal ? a.deal.name : a.label);
+  var label = a.type + ':' + (a.deal ? a.deal.name : a.label);
+  if (a.type === 'update') {
+    label += '(' + a.changes.map(function (c) { return c.field; }).join(',') + ')';
+  }
+  return label;
 }
 
 // ---------------------------------------------------------------------------

@@ -20,9 +20,11 @@ var CONFIG = {
   // When true, syncDeck() only logs what it would do and makes no edits.
   DRY_RUN: true,
 
-  // When a deal's sheet data changes, delete its slide pair and regenerate it
-  // from the template. (Manual one-off edits to that pair are lost on rebuild.)
-  REBUILD_ON_CHANGE: true,
+  // When a deal's sheet data changes, patch only the changed values in place
+  // on its existing slides (old value -> new value). Manual edits to anything
+  // else — including custom stat chips — are preserved; if an old value can't
+  // be found (because it was manually overridden), it's left alone and logged.
+  UPDATE_ON_CHANGE: true,
 
   // Treatment for deals that leave the sheet or flip to Available? = No:
   // slides are hidden (skipped) and marked with this prefix.

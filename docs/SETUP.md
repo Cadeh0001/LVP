@@ -85,7 +85,8 @@ run (twice daily during business hours):
 - add a row with `Available? = Yes` → two new styled slides + table/cover update
 - flip `Available?` to `No` (or delete the row) → slides hidden + `REMOVED — `
 - flip back to `Yes` → slides reinstated
-- edit any field → that deal's slides regenerate
+- edit any field → just that value is patched on the deal's slides; manual
+  customizations elsewhere on the slides are preserved
 
 To force an immediate sync, run `syncDeck` from the editor.
 
@@ -94,8 +95,10 @@ To force an immediate sync, run `syncDeck` from the editor.
 - **"no template pair — run setupTemplate()"** — step 2.2 wasn't completed, or
   the hidden template slides were deleted. Re-run `setupTemplate`.
 - **A deal's slides didn't update after a sheet edit** — check the Executions
-  log; most likely the address was edited, which changes the deal's identity:
-  the old pair goes to REMOVED and a fresh pair is created. That's by design
-  (the address is the deal key).
+  log. Either the old value was manually overridden on the slide (the log says
+  "not found ... left as-is"; paste the sheet value onto the slide to re-sync
+  it), or the address was edited, which changes the deal's identity: the old
+  pair goes to REMOVED and a fresh pair is created. That's by design (the
+  address is the deal key).
 - **Cover/glance numbers look off** — they're computed only from rows with
   `Available? = Yes`; verify that column.
