@@ -72,7 +72,7 @@ Available placeholders:
 2. In `Config.js`, set `DRY_RUN: false` (`clasp push` or edit in the editor).
 3. Run **`syncDeck`** again and review the deck.
 4. Run **`installSyncTrigger`** — the sync now runs twice each day, in the
-   9 AM and 3 PM hours (script timezone, set in `appsscript.json`; change the
+   9 AM and 4 PM hours (script timezone, set in `appsscript.json`; change the
    hours via `SYNC_AT_HOURS` in `Config.js` and re-run this function). Failures
    email the account automatically (default trigger notifications); executions
    are visible under the project's **Executions** tab.

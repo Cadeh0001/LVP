@@ -36,10 +36,10 @@ var CONFIG = {
   REMOVED_PREFIX: 'REMOVED — ',
 
   // Hours of the day (0-23) the sync runs, in the script's timezone
-  // (appsscript.json "timeZone", currently America/New_York). Apps Script
+  // (appsscript.json "timeZone", currently America/Chicago). Apps Script
   // fires each run at some point within that hour. Default: twice a day
   // during business hours. Re-run installSyncTrigger() after changing this.
-  SYNC_AT_HOURS: [9, 15],
+  SYNC_AT_HOURS: [9, 16],
 };
 
 // ═══════════════════════════════ Util.js ═══════════════════════════════

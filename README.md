@@ -60,7 +60,7 @@ notes (`[[LVP:deal=<key>;role=overview]]`), keyed by the deal's street address
 See **[docs/SETUP.md](docs/SETUP.md)**. Short version: push this code to an
 Apps Script project with `clasp`, run the two bootstrap functions once, do a
 dry run, flip `DRY_RUN` to `false`, and install the triggers (twice daily
-during business hours — 9 AM and 3 PM Eastern by default, see
+during business hours — 9 AM and 4 PM Central by default, see
 `SYNC_AT_HOURS` in `Config.js`).
 
 ## Sheet conventions
