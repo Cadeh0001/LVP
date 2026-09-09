@@ -1,8 +1,8 @@
 /**
  * LVP Deck Sync — entry points.
  *
- * syncDeck()             The hourly sync. Sheet -> deck.
- * installHourlyTrigger() Create the hourly time-driven trigger.
+ * syncDeck()             The scheduled sync. Sheet -> deck.
+ * installSyncTrigger()   Create the time-driven triggers (CONFIG.SYNC_AT_HOURS).
  * removeAllTriggers()    Remove this project's triggers.
  *
  * First-time setup lives in Bootstrap.js (bootstrapTagExistingSlides, then
@@ -117,10 +117,13 @@ function describeAction(a) {
 // Triggers
 // ---------------------------------------------------------------------------
 
-function installHourlyTrigger() {
+function installSyncTrigger() {
   removeAllTriggers();
-  ScriptApp.newTrigger('syncDeck').timeBased().everyHours(1).create();
-  Logger.log('Hourly syncDeck trigger installed.');
+  CONFIG.SYNC_AT_HOURS.forEach(function (hour) {
+    ScriptApp.newTrigger('syncDeck').timeBased().everyDays(1).atHour(hour).create();
+  });
+  Logger.log('syncDeck triggers installed: daily at hours %s (%s).',
+    CONFIG.SYNC_AT_HOURS.join(', '), Session.getScriptTimeZone());
 }
 
 function removeAllTriggers() {

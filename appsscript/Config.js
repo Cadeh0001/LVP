@@ -27,4 +27,10 @@ var CONFIG = {
   // Treatment for deals that leave the sheet or flip to Available? = No:
   // slides are hidden (skipped) and marked with this prefix.
   REMOVED_PREFIX: 'REMOVED — ',
+
+  // Hours of the day (0-23) the sync runs, in the script's timezone
+  // (appsscript.json "timeZone", currently America/New_York). Apps Script
+  // fires each run at some point within that hour. Default: twice a day
+  // during business hours. Re-run installSyncTrigger() after changing this.
+  SYNC_AT_HOURS: [9, 15],
 };

@@ -60,13 +60,16 @@ Available placeholders:
    plan (creates/rebuilds/removals). Check it matches your expectations.
 2. In `Config.js`, set `DRY_RUN: false` (`clasp push` or edit in the editor).
 3. Run **`syncDeck`** again and review the deck.
-4. Run **`installHourlyTrigger`** — the sync now runs every hour. Failures
+4. Run **`installSyncTrigger`** — the sync now runs twice each day, in the
+   9 AM and 3 PM hours (script timezone, set in `appsscript.json`; change the
+   hours via `SYNC_AT_HOURS` in `Config.js` and re-run this function). Failures
    email the account automatically (default trigger notifications); executions
    are visible under the project's **Executions** tab.
 
 ## Day-to-day
 
-Nothing. Edit the Consolidated Sheet; the deck follows within the hour:
+Nothing. Edit the Consolidated Sheet; the deck follows at the next scheduled
+run (twice daily during business hours):
 
 - add a row with `Available? = Yes` → two new styled slides + table/cover update
 - flip `Available?` to `No` (or delete the row) → slides hidden + `REMOVED — `

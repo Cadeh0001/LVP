@@ -7,7 +7,7 @@ with the deals in the **Current Deals** Drive folder
 ## How it works
 
 ```
-Consolidated Sheet  ──hourly──▶  Apps Script (syncDeck)  ──▶  Slides deck
+Consolidated Sheet  ──2x daily──▶  Apps Script (syncDeck)  ──▶  Slides deck
 (source of truth)                                             · cover stats
 one row per deal                                              · glance table
 Available? = Yes/No                                           · 2 slides per deal
@@ -56,7 +56,9 @@ notes (`[[LVP:deal=<key>;role=overview]]`), keyed by the deal's street address
 
 See **[docs/SETUP.md](docs/SETUP.md)**. Short version: push this code to an
 Apps Script project with `clasp`, run the two bootstrap functions once, do a
-dry run, flip `DRY_RUN` to `false`, and install the hourly trigger.
+dry run, flip `DRY_RUN` to `false`, and install the triggers (twice daily
+during business hours — 9 AM and 3 PM Eastern by default, see
+`SYNC_AT_HOURS` in `Config.js`).
 
 ## Sheet conventions
 
